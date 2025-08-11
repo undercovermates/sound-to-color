@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound to Color Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            position: relative;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            font-weight: 300;
+        }
+
+        .controls {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            color: #fff;
+            margin-bottom: 20px;
+            font-size: 18px;
+            opacity: 0.8;
+        }
+
+        canvas {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .frequency-bars {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 2px;
+            align-items: end;
+        }
+
+        .freq-bar {
+            width: 4px;
+            background: linear-gradient(to top, #ff006e, #8338ec, #3a86ff);
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <strong>How it works:</strong><br>
+        • Bass (red/orange dots)<br>
+        • Mids (green/yellow dots)<br>
+        • Treble (blue/purple dots)<br>
+        • Dot size = volume<br>
+        • Position = frequency spread
+    </div>
+
+    <div class="container">
+        <h1>🎵 Sound → Color Visualizer</h1>
+        
+        <div class="status" id="status">Click "Start Listening" to begin</div>
+        
+        <div class="controls">
+            <button id="startBtn">Start Listening</button>
+            <button id="stopBtn" disabled>Stop</button>
+            <button id="clearBtn">Clear Canvas</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="frequency-bars" id="freqBars"></div>
+
+    <script>
+        class AudioColorVisualizer {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.audioContext = null;
+                this.analyser = null;
+                this.microphone = null;
+                this.dataArray = null;
+                this.isListening = false;
+                
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.status = document.getElementById('status');
+                
+                this.dots = [];
+                this.maxDots = 200;
+                
+                this.setupEventListeners();
+                this.setupFrequencyBars();
+                this.animate();
+            }
+
+            setupEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startListening());
+                this.stopBtn.addEventListener('click', () => this.stopListening());
+                this.clearBtn.addEventListener('click', () => this.clearCanvas());
+            }
+
+            setupFrequencyBars() {
+                const freqBars = document.getElementById('freqBars');
+                for (let i = 0; i < 20; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'freq-bar';
+                    bar.style.height = '5px';
+                    freqBars.appendChild(bar);
+                }
+            }
+
+            async startListening() {
+                try {
+                    this.status.textContent = "Requesting microphone access...";
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: { 
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        } 
+                    });
+                    
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.analyser = this.audioContext.createAnalyser();
+                    this.analyser.fftSize = 512;
+                    this.analyser.smoothingTimeConstant = 0.3;
+                    
+                    this.microphone = this.audioContext.createMediaStreamSource(stream);
+                    this.microphone.connect(this.analyser);
+                    
+                    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                    
+                    this.isListening = true;
+                    this.status.textContent = "🎤 Listening... Make some noise!";
+                    
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    this.status.textContent = "❌ Microphone access denied or not available";
+                }
+            }
+
+            stopListening() {
+                this.isListening = false;
+                
+                if (this.microphone) {
+                    this.microphone.disconnect();
+                    this.microphone = null;
+                }
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+                
+                this.status.textContent = "🔇 Stopped listening";
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                
+                // Reset frequency bars
+                const bars = document.querySelectorAll('.freq-bar');
+                bars.forEach(bar => bar.style.height = '5px');
+            }
+
+            clearCanvas() {
+                this.dots = [];
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            frequencyToColor(frequency, amplitude) {
+                // Map frequency ranges to colors
+                const bassRange = frequency < 85;
+                const midRange = frequency >= 85 && frequency < 170;
+                const trebleRange = frequency >= 170;
+                
+                let r, g, b;
+                
+                if (bassRange) {
+                    // Bass: Red to Orange
+                    r = 255;
+                    g = Math.floor(amplitude * 150 / 255);
+                    b = 0;
+                } else if (midRange) {
+                    // Mids: Yellow to Green
+                    r = Math.floor(255 - amplitude * 100 / 255);
+                    g = 255;
+                    b = Math.floor(amplitude * 50 / 255);
+                } else {
+                    // Treble: Blue to Purple
+                    r = Math.floor(amplitude * 200 / 255);
+                    g = Math.floor(amplitude * 50 / 255);
+                    b = 255;
+                }
+                
+                return `rgba(${r}, ${g}, ${b}, ${amplitude / 255})`;
+            }
+
+            addDot(frequency, amplitude) {
+                if (amplitude < 30) return; // Noise threshold
+                
+                const x = (frequency / 256) * this.canvas.width;
+                const y = Math.random() * this.canvas.height;
+                const size = (amplitude / 255) * 15 + 2;
+                const color = this.frequencyToColor(frequency, amplitude);
+                
+                this.dots.push({
+                    x: x,
+                    y: y,
+                    size: size,
+                    color: color,
+                    life: 1.0,
+                    decay: 0.01 + Math.random() * 0.02
+                });
+                
+                // Remove old dots
+                if (this.dots.length > this.maxDots) {
+                    this.dots.shift();
+                }
+            }
+
+            updateFrequencyBars() {
+                if (!this.isListening || !this.dataArray) return;
+                
+                const bars = document.querySelectorAll('.freq-bar');
+                const step = Math.floor(this.dataArray.length / bars.length);
+                
+                bars.forEach((bar, i) => {
+                    const value = this.dataArray[i * step];
+                    const height = Math.max(5, (value / 255) * 60);
+                    bar.style.height = height + 'px';
+                });
+            }
+
+            animate() {
+                if (this.isListening && this.analyser) {
+                    this.analyser.getByteFrequencyData(this.dataArray);
+                    
+                    // Add new dots based on frequency data
+                    for (let i = 0; i < this.dataArray.length; i += 3) {
+                        const amplitude = this.dataArray[i];
+                        if (amplitude > 0) {
+                            this.addDot(i, amplitude);
+                        }
+                    }
+                    
+                    this.updateFrequencyBars();
+                }
+                
+                // Clear canvas with fade effect
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Update and draw dots
+                this.dots = this.dots.filter(dot => {
+                    dot.life -= dot.decay;
+                    dot.size *= 0.98;
+                    
+                    if (dot.life > 0) {
+                        this.ctx.save();
+                        this.ctx.globalAlpha = dot.life;
+                        this.ctx.fillStyle = dot.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.restore();
+                        return true;
+                    }
+                    return false;
+                });
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Initialize the visualizer when the page loads
+        window.addEventListener('load', () => {
+            new AudioColorVisualizer();
+        });
+    </script>
+</body>
+</html>
