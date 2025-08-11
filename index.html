@@ -74,8 +74,15 @@
 
         .status {
             font-size: 14px;
-            opacity: 0.8;
+            opacity: 0.9;
             margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .canvas-container {
@@ -175,7 +182,9 @@
 <body>
     <div class="header">
         <h1>🎨 Sound Painting</h1>
-        <div class="status" id="status">Create art with sound - each frequency becomes a brushstroke</div>
+        <div class="status" id="status">
+            <span>🎤 Tap "Start Painting" to enable microphone and create art with sound</span>
+        </div>
         
         <div class="controls">
             <button id="startBtn">Start Painting</button>
@@ -286,23 +295,47 @@
                 try {
                     this.status.textContent = "🎤 Requesting microphone access...";
                     
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: { 
-                            echoCancellation: false,
+                    // Check if mediaDevices is supported
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('MediaDevices API not supported');
+                    }
+                    
+                    // More permissive audio constraints for mobile
+                    const constraints = {
+                        audio: {
+                            echoCancellation: true,
                             noiseSuppression: false,
-                            autoGainControl: false
-                        } 
+                            autoGainControl: false,
+                            sampleRate: 44100,
+                            channelCount: 1
+                        }
+                    };
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    // Create audio context with better mobile support
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.audioContext = new AudioContext({
+                        sampleRate: 44100,
+                        latencyHint: 'interactive'
                     });
                     
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    // Resume context if suspended (common on mobile)
+                    if (this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+                    
                     this.analyser = this.audioContext.createAnalyser();
-                    this.analyser.fftSize = 1024;
-                    this.analyser.smoothingTimeConstant = 0.8;
+                    this.analyser.fftSize = 2048; // Larger for better frequency resolution
+                    this.analyser.smoothingTimeConstant = 0.6;
+                    this.analyser.minDecibels = -90;
+                    this.analyser.maxDecibels = -10;
                     
                     this.microphone = this.audioContext.createMediaStreamSource(stream);
                     this.microphone.connect(this.analyser);
                     
                     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                    this.stream = stream; // Keep reference to stop it later
                     
                     this.isListening = true;
                     this.status.textContent = "🎨 Painting with sound... Make noise to create art!";
@@ -310,9 +343,36 @@
                     this.startBtn.disabled = true;
                     this.pauseBtn.disabled = false;
                     
+                    // Test audio input
+                    setTimeout(() => {
+                        if (this.isListening) {
+                            this.analyser.getByteFrequencyData(this.dataArray);
+                            const hasInput = this.dataArray.some(val => val > 0);
+                            if (!hasInput) {
+                                this.status.textContent = "🎤 Microphone connected - try speaking or making sounds!";
+                            }
+                        }
+                    }, 2000);
+                    
                 } catch (error) {
-                    console.error('Error accessing microphone:', error);
-                    this.status.textContent = "❌ Microphone access needed to paint with sound";
+                    console.error('Microphone error:', error);
+                    
+                    if (error.name === 'NotAllowedError') {
+                        this.status.textContent = "❌ Microphone permission denied. Please allow access and refresh.";
+                    } else if (error.name === 'NotFoundError') {
+                        this.status.textContent = "❌ No microphone found. Please check your device.";
+                    } else if (error.name === 'NotSupportedError') {
+                        this.status.textContent = "❌ Microphone not supported on this browser.";
+                    } else {
+                        this.status.textContent = "❌ Microphone access failed. Try refreshing the page.";
+                    }
+                    
+                    // Show mobile-specific instructions
+                    if (/Mobile|Android|iPhone|iPad/.test(navigator.userAgent)) {
+                        setTimeout(() => {
+                            this.status.textContent += " On mobile: ensure microphone permission is enabled in browser settings.";
+                        }, 3000);
+                    }
                 }
             }
 
@@ -321,9 +381,17 @@
                 
                 if (this.microphone) {
                     this.microphone.disconnect();
+                    this.microphone = null;
                 }
-                if (this.audioContext) {
-                    this.audioContext.suspend();
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                if (this.audioContext && this.audioContext.state !== 'closed') {
+                    this.audioContext.close();
+                    this.audioContext = null;
                 }
                 
                 this.status.textContent = "⏸️ Painting paused";
