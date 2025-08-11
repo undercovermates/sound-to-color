@@ -3,142 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sound to Color Visualizer</title>
+    <title>Sound Painting Generator</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            font-family: 'Arial', sans-serif;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0c0c0c, #1a1a1a);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: white;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
-        .container {
+        .header {
+            padding: 15px;
             text-align: center;
-            z-index: 10;
-            position: relative;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
         }
 
-        h1 {
-            color: #fff;
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-            font-weight: 300;
+        .header h1 {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .controls {
-            margin-bottom: 30px;
             display: flex;
-            gap: 15px;
+            gap: 10px;
             justify-content: center;
             flex-wrap: wrap;
+            margin-bottom: 15px;
         }
 
         button {
-            padding: 12px 24px;
-            font-size: 16px;
+            padding: 12px 20px;
+            font-size: 14px;
             background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
             border: none;
-            border-radius: 50px;
+            border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-            min-width: 120px;
+            touch-action: manipulation;
+            min-width: 100px;
         }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: scale(0.95);
         }
 
         button:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
 
         .status {
-            color: #fff;
-            margin-bottom: 20px;
-            font-size: 18px;
+            font-size: 14px;
             opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            position: relative;
         }
 
         canvas {
+            max-width: 100%;
+            max-height: 80vh;
             border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            background: #ffffff;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            touch-action: none;
         }
 
-        .info {
+        .painting-info {
             position: absolute;
             top: 20px;
             left: 20px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 14px;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-            max-width: 300px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 200px;
+            backdrop-filter: blur(5px);
         }
 
-        .frequency-bars {
+        .brush-preview {
             position: absolute;
-            bottom: 20px;
+            top: 20px;
             right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+        }
+
+        .brush-preview-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin: 5px auto;
+            border: 2px solid white;
+        }
+
+        .frequency-display {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 2px;
-            align-items: end;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
         }
 
         .freq-bar {
-            width: 4px;
-            background: linear-gradient(to top, #ff006e, #8338ec, #3a86ff);
+            width: 3px;
+            background: linear-gradient(to top, #ff4757, #ffa502, #2ed573, #1e90ff, #5352ed);
             border-radius: 2px;
+            min-height: 5px;
             transition: height 0.1s ease;
+        }
+
+        @media (max-width: 768px) {
+            .painting-info {
+                position: static;
+                margin: 10px;
+                max-width: none;
+            }
+            
+            .brush-preview {
+                position: static;
+                margin: 10px;
+                display: inline-block;
+            }
+            
+            .frequency-display {
+                bottom: 10px;
+                padding: 6px;
+            }
+            
+            .freq-bar {
+                width: 2px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="info">
-        <strong>How it works:</strong><br>
-        • Bass (red/orange dots)<br>
-        • Mids (green/yellow dots)<br>
-        • Treble (blue/purple dots)<br>
-        • Dot size = volume<br>
-        • Position = frequency spread
-    </div>
-
-    <div class="container">
-        <h1>🎵 Sound → Color Visualizer</h1>
-        
-        <div class="status" id="status">Click "Start Listening" to begin</div>
+    <div class="header">
+        <h1>🎨 Sound Painting</h1>
+        <div class="status" id="status">Create art with sound - each frequency becomes a brushstroke</div>
         
         <div class="controls">
-            <button id="startBtn">Start Listening</button>
-            <button id="stopBtn" disabled>Stop</button>
-            <button id="clearBtn">Clear Canvas</button>
+            <button id="startBtn">Start Painting</button>
+            <button id="pauseBtn" disabled>Pause</button>
+            <button id="saveBtn">Save Art</button>
+            <button id="clearBtn">New Canvas</button>
         </div>
-
-        <canvas id="canvas" width="800" height="500"></canvas>
     </div>
 
-    <div class="frequency-bars" id="freqBars"></div>
+    <div class="painting-info">
+        <strong>🎵 Sound → Paint:</strong><br>
+        • Bass = Warm colors (red/orange)<br>
+        • Mid = Nature colors (green/yellow)<br>
+        • Treble = Cool colors (blue/purple)<br>
+        • Volume = Brush size<br>
+        • Tempo = Paint density
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="paintingCanvas" width="800" height="600"></canvas>
+        
+        <div class="brush-preview">
+            <div>Current Brush:</div>
+            <div class="brush-preview-circle" id="brushPreview"></div>
+            <div id="brushSize">Size: 5px</div>
+        </div>
+    </div>
+
+    <div class="frequency-display" id="freqDisplay"></div>
 
     <script>
-        class AudioColorVisualizer {
+        class SoundPaintingGenerator {
             constructor() {
-                this.canvas = document.getElementById('canvas');
+                this.canvas = document.getElementById('paintingCanvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.audioContext = null;
                 this.analyser = null;
@@ -146,38 +217,74 @@
                 this.dataArray = null;
                 this.isListening = false;
                 
+                // Painting state
+                this.paintX = 0;
+                this.paintY = 0;
+                this.lastPaintTime = 0;
+                this.paintDirection = Math.random() * Math.PI * 2;
+                
+                this.setupElements();
+                this.setupEventListeners();
+                this.setupFrequencyDisplay();
+                this.initializeCanvas();
+                this.animate();
+            }
+
+            setupElements() {
                 this.startBtn = document.getElementById('startBtn');
-                this.stopBtn = document.getElementById('stopBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.saveBtn = document.getElementById('saveBtn');
                 this.clearBtn = document.getElementById('clearBtn');
                 this.status = document.getElementById('status');
-                
-                this.dots = [];
-                this.maxDots = 200;
-                
-                this.setupEventListeners();
-                this.setupFrequencyBars();
-                this.animate();
+                this.brushPreview = document.getElementById('brushPreview');
+                this.brushSizeDisplay = document.getElementById('brushSize');
             }
 
             setupEventListeners() {
                 this.startBtn.addEventListener('click', () => this.startListening());
-                this.stopBtn.addEventListener('click', () => this.stopListening());
+                this.pauseBtn.addEventListener('click', () => this.pauseListening());
+                this.saveBtn.addEventListener('click', () => this.savePainting());
                 this.clearBtn.addEventListener('click', () => this.clearCanvas());
+                
+                // Handle window resize
+                window.addEventListener('resize', () => this.handleResize());
             }
 
-            setupFrequencyBars() {
-                const freqBars = document.getElementById('freqBars');
-                for (let i = 0; i < 20; i++) {
+            setupFrequencyDisplay() {
+                const freqDisplay = document.getElementById('freqDisplay');
+                for (let i = 0; i < 32; i++) {
                     const bar = document.createElement('div');
                     bar.className = 'freq-bar';
                     bar.style.height = '5px';
-                    freqBars.appendChild(bar);
+                    freqDisplay.appendChild(bar);
                 }
+            }
+
+            initializeCanvas() {
+                // Set canvas to white background
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Initialize painting position
+                this.paintX = this.canvas.width / 2;
+                this.paintY = this.canvas.height / 2;
+            }
+
+            handleResize() {
+                // Maintain canvas aspect ratio on mobile
+                const container = this.canvas.parentElement;
+                const containerRect = container.getBoundingClientRect();
+                const maxWidth = containerRect.width - 30;
+                const maxHeight = window.innerHeight * 0.6;
+                
+                const scale = Math.min(maxWidth / 800, maxHeight / 600);
+                this.canvas.style.width = (800 * scale) + 'px';
+                this.canvas.style.height = (600 * scale) + 'px';
             }
 
             async startListening() {
                 try {
-                    this.status.textContent = "Requesting microphone access...";
+                    this.status.textContent = "🎤 Requesting microphone access...";
                     
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         audio: { 
@@ -189,8 +296,8 @@
                     
                     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     this.analyser = this.audioContext.createAnalyser();
-                    this.analyser.fftSize = 512;
-                    this.analyser.smoothingTimeConstant = 0.3;
+                    this.analyser.fftSize = 1024;
+                    this.analyser.smoothingTimeConstant = 0.8;
                     
                     this.microphone = this.audioContext.createMediaStreamSource(stream);
                     this.microphone.connect(this.analyser);
@@ -198,152 +305,167 @@
                     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
                     
                     this.isListening = true;
-                    this.status.textContent = "🎤 Listening... Make some noise!";
+                    this.status.textContent = "🎨 Painting with sound... Make noise to create art!";
                     
                     this.startBtn.disabled = true;
-                    this.stopBtn.disabled = false;
+                    this.pauseBtn.disabled = false;
                     
                 } catch (error) {
                     console.error('Error accessing microphone:', error);
-                    this.status.textContent = "❌ Microphone access denied or not available";
+                    this.status.textContent = "❌ Microphone access needed to paint with sound";
                 }
             }
 
-            stopListening() {
+            pauseListening() {
                 this.isListening = false;
                 
                 if (this.microphone) {
                     this.microphone.disconnect();
-                    this.microphone = null;
                 }
-                
                 if (this.audioContext) {
-                    this.audioContext.close();
-                    this.audioContext = null;
+                    this.audioContext.suspend();
                 }
                 
-                this.status.textContent = "🔇 Stopped listening";
+                this.status.textContent = "⏸️ Painting paused";
                 this.startBtn.disabled = false;
-                this.stopBtn.disabled = true;
+                this.pauseBtn.disabled = true;
+            }
+
+            savePainting() {
+                const link = document.createElement('a');
+                link.download = `sound-painting-${Date.now()}.png`;
+                link.href = this.canvas.toDataURL();
+                link.click();
                 
-                // Reset frequency bars
-                const bars = document.querySelectorAll('.freq-bar');
-                bars.forEach(bar => bar.style.height = '5px');
+                this.status.textContent = "💾 Painting saved!";
+                setTimeout(() => {
+                    this.status.textContent = this.isListening ? 
+                        "🎨 Painting with sound..." : "⏸️ Painting paused";
+                }, 2000);
             }
 
             clearCanvas() {
-                this.dots = [];
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.initializeCanvas();
+                this.status.textContent = "🆕 New canvas ready!";
+                setTimeout(() => {
+                    this.status.textContent = this.isListening ? 
+                        "🎨 Painting with sound..." : "Click 'Start Painting' to begin";
+                }, 2000);
             }
 
-            frequencyToColor(frequency, amplitude) {
-                // Map frequency ranges to colors
-                const bassRange = frequency < 85;
-                const midRange = frequency >= 85 && frequency < 170;
-                const trebleRange = frequency >= 170;
-                
+            getColorFromFrequency(freqIndex, amplitude) {
+                const normalizedFreq = freqIndex / this.dataArray.length;
                 let r, g, b;
                 
-                if (bassRange) {
-                    // Bass: Red to Orange
-                    r = 255;
-                    g = Math.floor(amplitude * 150 / 255);
-                    b = 0;
-                } else if (midRange) {
-                    // Mids: Yellow to Green
-                    r = Math.floor(255 - amplitude * 100 / 255);
-                    g = 255;
-                    b = Math.floor(amplitude * 50 / 255);
+                if (normalizedFreq < 0.33) {
+                    // Bass frequencies - warm colors
+                    const bassIntensity = normalizedFreq / 0.33;
+                    r = Math.floor(255 * (0.8 + bassIntensity * 0.2));
+                    g = Math.floor(amplitude * (0.3 + bassIntensity * 0.4));
+                    b = Math.floor(amplitude * 0.2);
+                } else if (normalizedFreq < 0.66) {
+                    // Mid frequencies - nature colors
+                    const midIntensity = (normalizedFreq - 0.33) / 0.33;
+                    r = Math.floor(amplitude * (0.8 - midIntensity * 0.5));
+                    g = Math.floor(255 * (0.6 + midIntensity * 0.4));
+                    b = Math.floor(amplitude * (0.2 + midIntensity * 0.3));
                 } else {
-                    // Treble: Blue to Purple
-                    r = Math.floor(amplitude * 200 / 255);
-                    g = Math.floor(amplitude * 50 / 255);
-                    b = 255;
+                    // Treble frequencies - cool colors
+                    const trebleIntensity = (normalizedFreq - 0.66) / 0.34;
+                    r = Math.floor(amplitude * (0.3 - trebleIntensity * 0.2));
+                    g = Math.floor(amplitude * (0.4 + trebleIntensity * 0.3));
+                    b = Math.floor(255 * (0.7 + trebleIntensity * 0.3));
                 }
                 
-                return `rgba(${r}, ${g}, ${b}, ${amplitude / 255})`;
+                return `rgba(${r}, ${g}, ${b}, ${Math.max(0.3, amplitude / 255)})`;
             }
 
-            addDot(frequency, amplitude) {
-                if (amplitude < 30) return; // Noise threshold
+            paintPixels() {
+                if (!this.isListening || !this.dataArray) return;
                 
-                const x = (frequency / 256) * this.canvas.width;
-                const y = Math.random() * this.canvas.height;
-                const size = (amplitude / 255) * 15 + 2;
-                const color = this.frequencyToColor(frequency, amplitude);
+                this.analyser.getByteFrequencyData(this.dataArray);
                 
-                this.dots.push({
-                    x: x,
-                    y: y,
-                    size: size,
-                    color: color,
-                    life: 1.0,
-                    decay: 0.01 + Math.random() * 0.02
-                });
+                // Calculate overall energy
+                let totalEnergy = 0;
+                let dominantFreq = 0;
+                let maxAmplitude = 0;
                 
-                // Remove old dots
-                if (this.dots.length > this.maxDots) {
-                    this.dots.shift();
+                for (let i = 0; i < this.dataArray.length; i++) {
+                    const amplitude = this.dataArray[i];
+                    totalEnergy += amplitude;
+                    if (amplitude > maxAmplitude) {
+                        maxAmplitude = amplitude;
+                        dominantFreq = i;
+                    }
                 }
+                
+                if (totalEnergy < 500) return; // Noise threshold
+                
+                // Paint brush size based on volume
+                const brushSize = Math.max(2, (maxAmplitude / 255) * 25);
+                
+                // Paint color based on dominant frequency
+                const paintColor = this.getColorFromFrequency(dominantFreq, maxAmplitude);
+                
+                // Update brush preview
+                this.brushPreview.style.background = paintColor;
+                this.brushSizeDisplay.textContent = `Size: ${Math.round(brushSize)}px`;
+                
+                // Paint movement based on frequency content
+                const freqSpread = this.dataArray.slice(0, 8).reduce((a, b) => a + b, 0);
+                this.paintDirection += (Math.random() - 0.5) * (freqSpread / 2000);
+                
+                const moveDistance = (totalEnergy / 10000) * 15;
+                this.paintX += Math.cos(this.paintDirection) * moveDistance;
+                this.paintY += Math.sin(this.paintDirection) * moveDistance;
+                
+                // Keep within canvas bounds
+                this.paintX = Math.max(brushSize, Math.min(this.canvas.width - brushSize, this.paintX));
+                this.paintY = Math.max(brushSize, Math.min(this.canvas.height - brushSize, this.paintY));
+                
+                // Paint the brush stroke
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'multiply';
+                this.ctx.fillStyle = paintColor;
+                this.ctx.beginPath();
+                this.ctx.arc(this.paintX, this.paintY, brushSize / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Add some texture with smaller dots
+                for (let i = 0; i < 3; i++) {
+                    const offsetX = (Math.random() - 0.5) * brushSize;
+                    const offsetY = (Math.random() - 0.5) * brushSize;
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.paintX + offsetX, this.paintY + offsetY, Math.random() * brushSize / 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                this.ctx.restore();
             }
 
-            updateFrequencyBars() {
+            updateFrequencyDisplay() {
                 if (!this.isListening || !this.dataArray) return;
                 
                 const bars = document.querySelectorAll('.freq-bar');
                 const step = Math.floor(this.dataArray.length / bars.length);
                 
                 bars.forEach((bar, i) => {
-                    const value = this.dataArray[i * step];
-                    const height = Math.max(5, (value / 255) * 60);
+                    const value = this.dataArray[i * step] || 0;
+                    const height = Math.max(5, (value / 255) * 40);
                     bar.style.height = height + 'px';
                 });
             }
 
             animate() {
-                if (this.isListening && this.analyser) {
-                    this.analyser.getByteFrequencyData(this.dataArray);
-                    
-                    // Add new dots based on frequency data
-                    for (let i = 0; i < this.dataArray.length; i += 3) {
-                        const amplitude = this.dataArray[i];
-                        if (amplitude > 0) {
-                            this.addDot(i, amplitude);
-                        }
-                    }
-                    
-                    this.updateFrequencyBars();
-                }
-                
-                // Clear canvas with fade effect
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                // Update and draw dots
-                this.dots = this.dots.filter(dot => {
-                    dot.life -= dot.decay;
-                    dot.size *= 0.98;
-                    
-                    if (dot.life > 0) {
-                        this.ctx.save();
-                        this.ctx.globalAlpha = dot.life;
-                        this.ctx.fillStyle = dot.color;
-                        this.ctx.beginPath();
-                        this.ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
-                        this.ctx.fill();
-                        this.ctx.restore();
-                        return true;
-                    }
-                    return false;
-                });
-                
+                this.paintPixels();
+                this.updateFrequencyDisplay();
                 requestAnimationFrame(() => this.animate());
             }
         }
 
-        // Initialize the visualizer when the page loads
+        // Initialize when page loads
         window.addEventListener('load', () => {
-            new AudioColorVisualizer();
+            new SoundPaintingGenerator();
         });
     </script>
 </body>
